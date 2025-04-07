@@ -90,7 +90,6 @@ where
 /// Processes blocks and persists data to SQLite database
 async fn process_blocks(
     block_handle: impl Handle,
-    sled_cache: Arc<sled::Db>,
     sqlite_persistence: persistence::SQLitePersistence,
     block_processed_tx: crossbeam_channel::Sender<u32>,
     sse_sender: broadcast::Sender<BlockAggregateOutput>,
@@ -99,6 +98,31 @@ async fn process_blocks(
 ) -> Result<(), AppError> {
     let mut p2pk_tx_count: i32 = initial_p2pk_addresses;
     let mut p2pk_satoshis: i64 = initial_p2pk_coins;
+
+    let cache_capacity_mb: u64 = env::var("SLED_CACHE_CAPACITY_MBS")
+    .ok()
+    .and_then(|s| s.parse::<usize>().ok())
+    .unwrap_or(1024) as u64;
+
+let sled_cache_path = env::var("SLED_CACHE_ABSOLUTE_PATH")
+    .unwrap_or_else(|_| "/tmp/gabriel/sled_cache".to_string());
+
+// Create parent directories for sled cacheif they don't exist
+if let Some(parent) = std::path::Path::new(&sled_cache_path).parent() {
+    std::fs::create_dir_all(parent)?;
+}
+
+let sled_config = sled::Config::new()
+    .path(&sled_cache_path)
+    // Configure cache capacity in MB including:
+    // - Data Cache: Recently accessed or modified key-value pairs
+    // - Index Cache: B-tree index for key lookups
+    // - Metadata: Various internal structures needed for cache operations
+    .cache_capacity(cache_capacity_mb * 1024 * 1024) // Convert MB to bytes
+    .open()?;
+
+let sled_cache = Arc::new(sled_config);
+info!("Initialized sled key-value store to track P2PK transactions. Cache capacity: {} MB, Path: {}", cache_capacity_mb, sled_cache_path);
 
     info!("Starting block processing...");
 
@@ -164,7 +188,7 @@ async fn process_blocks(
         block_processed_tx.send(height as u32)?;
 
         // Send SSE notification
-        if let Err(err) = sse_sender.send(block_data.clone()) {
+        if let Err(err) = sse_sender.send(block_data) {
             error!("Failed to send SSE: {:?}", err);
         }
 
@@ -290,31 +314,6 @@ async fn run_nakamoto_analysis(
     sse_sender: broadcast::Sender<BlockAggregateOutput>,
 ) -> Result<(), AppError> {
     
-    let cache_capacity_mb: u64 = env::var("SLED_CACHE_CAPACITY_MBS")
-        .ok()
-        .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or(1024) as u64;
-    
-    let db_path = env::var("SLED_CACHE_ABSOLUTE_PATH")
-        .unwrap_or_else(|_| "db".to_string());
-    
-    // Create parent directories for sled cacheif they don't exist
-    if let Some(parent) = std::path::Path::new(&db_path).parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    
-    let config = sled::Config::new()
-        .path(&db_path)
-        // Configure cache capacity in MB including:
-        // - Data Cache: Recently accessed or modified key-value pairs
-        // - Index Cache: B-tree index for key lookups
-        // - Metadata: Various internal structures needed for cache operations
-        .cache_capacity(cache_capacity_mb * 1024 * 1024) // Convert MB to bytes
-        .open()?;
-    
-    let db = Arc::new(config);
-    info!("Initialized sled key-value store to track P2PK transactions. Cache capacity: {} MB, Path: {}", cache_capacity_mb, db_path);
-
     info!("Initializing sqlite to store block data");
     let sqlite_persistence = persistence::SQLitePersistence::new(1)
         .await
@@ -360,7 +359,6 @@ async fn run_nakamoto_analysis(
         .unwrap_or_else(|_| "/tmp/gabriel/charts".to_string());
     std::fs::create_dir_all(&chart_capture_image_dir_path)?;
 
-    info!("Configuring Nakamoto client...");
     let cfg = Config::new(Network::Mainnet);
 
     info!("Creating Nakamoto client...");
@@ -373,7 +371,7 @@ async fn run_nakamoto_analysis(
     // Create a channel to signal when a block has been processed.
     let (block_processed_tx, block_processed_rx) = bounded::<u32>(1);
 
-    info!("Spawning client thread...");
+    info!("Spawning Nakamoto client thread...");
     // Spawn the client thread
     let client_rx = spawn_thread(move || match client.run(cfg) {
         Ok(_) => Ok(()),
@@ -383,7 +381,7 @@ async fn run_nakamoto_analysis(
         }
     });
 
-    // Read the peer count from the environment variable, defaulting to 4 if not set
+    // Read the Nakamoto client peer count from the environment variable, defaulting to 4 if not set
     let peer_count: usize = env::var("NAKAMOTO_PEER_COUNT")
         .ok()
         .and_then(|val| val.parse().ok())
@@ -396,7 +394,6 @@ async fn run_nakamoto_analysis(
     info!("Initial tip height: {}", tip_height);
 
     info!("Spawning block processing thread...");
-    let db_clone = Arc::clone(&db);
     let block_processor_rx = spawn_thread(move || {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -404,7 +401,6 @@ async fn run_nakamoto_analysis(
         runtime.block_on(async {
             process_blocks(
                 block_handle,
-                db_clone,
                 sqlite_persistence,
                 block_processed_tx,
                 sse_sender,
@@ -447,22 +443,22 @@ async fn run_nakamoto_analysis(
                     height, i
                 );
                 info!("Successfully processed block {}", height);
+
+                // Update the tip height after processing each block
+                let (new_tip_height, _) = header_handle.get_tip()?;
+                if new_tip_height > tip_height {
+                    info!("New tip height detected: {}", new_tip_height);
+                    tip_height = new_tip_height;
+                }
             }
             Err(e) => {
                 error!("Error waiting for block processing: {}", e);
                 break;
             }
         }
-
-        // Update the tip height after processing each block
-        let (new_tip_height, _) = header_handle.get_tip()?;
-        if new_tip_height > tip_height {
-            info!("New tip height detected: {}", new_tip_height);
-            tip_height = new_tip_height;
-        }
     }
 
-    info!("All blocks processed up to height {}.", tip_height);
+    info!("blocks processed up to {} out of {}.", resume_height, tip_height);
 
     info!("Shutting down Nakamoto client...");
     // Ask the client to terminate.
