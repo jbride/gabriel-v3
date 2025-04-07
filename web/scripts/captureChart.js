@@ -48,7 +48,7 @@
      //console.log('captureChart.js: Data loaded');
 
      // Get IMAGE_DIR_PATH from environment variable; Default to /tmp/gabriel/images
-     const imageDirPath = process.env.CHART_CAPTURE_IMAGE_DIR_PATH || '/tmp/gabriel/images';
+     const imageDirPath = process.env.CHART_CAPTURE_IMAGE_DIR_PATH || '/tmp/gabriel/charts';
 
      // Capture the chart as an image
      const chartElement = await page.$('#chart-container');

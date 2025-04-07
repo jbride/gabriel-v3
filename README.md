@@ -106,7 +106,7 @@ Set appropriate environment variables as follows:
     - number of seconds to wait after the chart is rendered before capturing the image.  Allows for dynamic data to fully render.
   - CHART_CAPTURE_IMAGE_DIR_PATH
     - optional
-    - defaults to "/tmp/gabriel/images"
+    - defaults to "/tmp/gabriel/charts"
     - directory to save captured images
   
 ```bash

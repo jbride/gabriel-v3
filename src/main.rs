@@ -326,6 +326,11 @@ async fn run_nakamoto_analysis(
         resume_height, p2pk_addresses, p2pk_coins
     );
 
+    // Ensure the static chart directory (for png images) exists based on CHART_CAPTURE_IMAGE_DIR_PATH environment variable
+    let chart_capture_image_dir_path = env::var("CHART_CAPTURE_IMAGE_DIR_PATH")
+        .unwrap_or_else(|_| "/tmp/gabriel/charts".to_string());
+    std::fs::create_dir_all(&chart_capture_image_dir_path)?;
+
     info!("Configuring Nakamoto client...");
     let cfg = Config::new(Network::Mainnet);
 
@@ -364,7 +369,9 @@ async fn run_nakamoto_analysis(
     info!("Spawning block processing thread...");
     let db_clone = Arc::clone(&db);
     let block_processor_rx = spawn_thread(move || {
-        let runtime = tokio::runtime::Runtime::new()?;
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?;
         runtime.block_on(async {
             process_blocks(
                 block_handle,
