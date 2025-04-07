@@ -100,6 +100,7 @@ Set appropriate environment variables as follows:
     - optional
     - defaults to 3
     - captures charts every N blocks
+    - set to -1 to disable chart capture
   - CHART_CAPTURE_DELAY_SECONDS
     - optional
     - defaults to 10

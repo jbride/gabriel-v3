@@ -13,7 +13,7 @@ use axum::{
 };
 use chrono::{TimeZone, Utc};
 use crossbeam_channel::bounded;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use nakamoto::client::{
     network::{Network, Services},
     traits::Handle,
@@ -61,10 +61,17 @@ pub enum AppError {
 
 // Get CHART_CAPTURE_FREQUENCY_BLOCKS from the environment or default to 3
 static CAPTURE_FREQUENCY: LazyLock<usize> = LazyLock::new(|| {
-    env::var("CHART_CAPTURE_FREQUENCY_BLOCKS")
+    let freq = env::var("CHART_CAPTURE_FREQUENCY_BLOCKS")
         .unwrap_or_else(|_| "3".to_string())
-        .parse()
-        .expect("CHART_CAPTURE_FREQUENCY_BLOCKS must be a valid number")
+        .parse::<i32>()
+        .expect("CHART_CAPTURE_FREQUENCY_BLOCKS must be a valid number");
+    
+    if freq < 0 {
+        warn!("CHART_CAPTURE_FREQUENCY_BLOCKS is set to -1, disabling chart capture");
+        usize::MAX
+    } else {
+        freq as usize
+    }
 });
 
 /// Function to spawn a thread and handle errors asynchronously
