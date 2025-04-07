@@ -2,7 +2,6 @@ use crate::AppError;
 use log::{info, error};
 use std::env;
 use std::path::PathBuf;
-use std::process::Command;
 use anyhow::Result;
 
 #[derive(Clone, Debug, serde::Serialize)]
@@ -56,14 +55,28 @@ pub async fn capture_p2pk_blocks_graph(block_height: usize) -> Result<(), AppErr
 
     info!("Executing JavaScript script at {}", js_path.display());
 
-    // Execute the command in fire-and-forget mode
-    let child = Command::new("node")
+    // Execute the command in fire-and-forget mode, but with a timeout
+    let child = tokio::process::Command::new("node")
         .arg(js_path)
         .arg(block_height.to_string())
         .spawn();
 
     match child {
-        Ok(_) => info!("JavaScript execution started successfully"),
+        Ok(mut child) => {
+            // Spawn a task to wait for the process and clean it up
+            tokio::spawn(async move {
+                // Add a timeout to prevent indefinite running
+                match tokio::time::timeout(std::time::Duration::from_secs(60), child.wait()).await {
+                    Ok(Ok(status)) => info!("JavaScript execution completed with status: {}", status),
+                    Ok(Err(e)) => error!("Error waiting for JavaScript execution: {}", e),
+                    Err(_) => {
+                        error!("JavaScript execution timed out, killing process");
+                        let _ = child.kill().await;
+                    }
+                }
+            });
+            info!("JavaScript execution started successfully");
+        },
         Err(e) => error!("Failed to start JavaScript execution: {}", e),
     }
 
