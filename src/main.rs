@@ -121,7 +121,6 @@ let sled_config = sled::Config::new()
     .cache_capacity(cache_capacity_mb * 1024 * 1024) // Convert MB to bytes
     .open()?;
 
-let sled_cache = Arc::new(sled_config);
 info!("Initialized sled key-value store to track P2PK transactions. Cache capacity: {} MB, Path: {}", cache_capacity_mb, sled_cache_path);
 
     info!("Starting block processing...");
@@ -139,7 +138,7 @@ info!("Initialized sled key-value store to track P2PK transactions. Cache capaci
 
             for (i, output) in tx.output.iter().enumerate() {
                 if output.script_pubkey.is_p2pk() {
-                    sled_cache.insert(
+                    sled_config.insert(
                         format!("{}:{}", txid, i).as_bytes(),
                         output.value.to_le_bytes().to_vec(),
                     )?;
@@ -153,11 +152,11 @@ info!("Initialized sled key-value store to track P2PK transactions. Cache capaci
                 let input_txid = input.previous_output.txid;
                 let input_vout = input.previous_output.vout;
                 let input_key = format!("{}:{}", input_txid, input_vout);
-                if let Some(value_bytes) = sled_cache.get(input_key.as_bytes())? {
+                if let Some(value_bytes) = sled_config.get(input_key.as_bytes())? {
                     let value = i64::from_le_bytes(value_bytes.as_ref().try_into().unwrap());
                     p2pk_tx_count -= 1;
                     p2pk_satoshis -= value;
-                    sled_cache.remove(input_key.as_bytes())?;
+                    sled_config.remove(input_key.as_bytes())?;
                 }
             }
         }
