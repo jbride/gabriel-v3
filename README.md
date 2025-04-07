@@ -79,6 +79,13 @@ Set appropriate environment variables as follows:
   - RUST_BACKTRACE
     - optional
     - set to 1 to view Rust backtraces (aka: stacktraces) when an error occurs
+  - SLED_CACHE_CAPACITY_MBS
+    - optional
+    - defaults to 1024
+    - set to a different number to change the cache capacity of the sled database
+  - SLED_CACHE_ABSOLUTE_PATH
+    - optional
+    - defaults to "db" directory in project root dir
   - SQLITE_ABSOLUTE_PATH
     - optional
     - default path is "db" directory in project root dir

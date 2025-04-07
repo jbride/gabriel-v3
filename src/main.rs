@@ -90,7 +90,7 @@ where
 /// Processes blocks and persists data to SQLite database
 async fn process_blocks(
     block_handle: impl Handle,
-    db: Arc<sled::Db>,
+    sled_cache: Arc<sled::Db>,
     sqlite_persistence: persistence::SQLitePersistence,
     block_processed_tx: crossbeam_channel::Sender<u32>,
     sse_sender: broadcast::Sender<BlockAggregateOutput>,
@@ -115,7 +115,7 @@ async fn process_blocks(
 
             for (i, output) in tx.output.iter().enumerate() {
                 if output.script_pubkey.is_p2pk() {
-                    db.insert(
+                    sled_cache.insert(
                         format!("{}:{}", txid, i).as_bytes(),
                         output.value.to_le_bytes().to_vec(),
                     )?;
@@ -129,11 +129,11 @@ async fn process_blocks(
                 let input_txid = input.previous_output.txid;
                 let input_vout = input.previous_output.vout;
                 let input_key = format!("{}:{}", input_txid, input_vout);
-                if let Some(value_bytes) = db.get(input_key.as_bytes())? {
+                if let Some(value_bytes) = sled_cache.get(input_key.as_bytes())? {
                     let value = i64::from_le_bytes(value_bytes.as_ref().try_into().unwrap());
                     p2pk_tx_count -= 1;
                     p2pk_satoshis -= value;
-                    db.remove(input_key.as_bytes())?;
+                    sled_cache.remove(input_key.as_bytes())?;
                 }
             }
         }
@@ -289,9 +289,22 @@ async fn main() -> Result<(), AppError> {
 async fn run_nakamoto_analysis(
     sse_sender: broadcast::Sender<BlockAggregateOutput>,
 ) -> Result<(), AppError> {
-    info!("Initializing sled key-value store to track P2PK transactions...");
-    let db = sled::open("db")?;
-    let db = Arc::new(db); // Wrap in Arc for thread-safe sharing
+    
+    let cache_capacity_mb: u64 = env::var("SLED_CACHE_CAPACITY_MBS")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(1024) as u64;
+    
+    let db_path = env::var("SLED_CACHE_ABSOLUTE_PATH")
+        .unwrap_or_else(|_| "db".to_string());
+    
+    let config = sled::Config::new()
+        .path(&db_path)
+        .cache_capacity(cache_capacity_mb * 1024 * 1024) // Convert MB to bytes
+        .open()?;
+    
+    let db = Arc::new(config);
+    info!("Initialized sled key-value store to track P2PK transactions. Cache capacity: {} MB, Path: {}", cache_capacity_mb, db_path);
 
     info!("Initializing sqlite to store block data");
     let sqlite_persistence = persistence::SQLitePersistence::new(1)
