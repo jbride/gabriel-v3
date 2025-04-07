@@ -88,8 +88,7 @@ Set appropriate environment variables as follows:
     - defaults to "db" directory in project root dir
   - SQLITE_ABSOLUTE_PATH
     - optional
-    - default path is "db" directory in project root dir
-    - ie: /path/to/gabriel_p2pk.db
+    - default path is /tmp/gabriel/gabriel_p2pk.db
   - REACT_APP_API_BASE_URL
     - optional
     - defaults to "http://0.0.0.0:3000"  (which corresponds to running in release mode in a local environment)

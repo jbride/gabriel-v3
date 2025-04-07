@@ -298,8 +298,17 @@ async fn run_nakamoto_analysis(
     let db_path = env::var("SLED_CACHE_ABSOLUTE_PATH")
         .unwrap_or_else(|_| "db".to_string());
     
+    // Create parent directories for sled cacheif they don't exist
+    if let Some(parent) = std::path::Path::new(&db_path).parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    
     let config = sled::Config::new()
         .path(&db_path)
+        // Configure cache capacity in MB including:
+        // - Data Cache: Recently accessed or modified key-value pairs
+        // - Index Cache: B-tree index for key lookups
+        // - Metadata: Various internal structures needed for cache operations
         .cache_capacity(cache_capacity_mb * 1024 * 1024) // Convert MB to bytes
         .open()?;
     
