@@ -5,18 +5,19 @@ gabriel-v3
     - [2.0.1. Hardware](#201-hardware)
     - [2.0.2. Software](#202-software)
       - [2.0.2.1. Rust](#2021-rust)
-      - [Node JS](#node-js)
-      - [OS packages](#os-packages)
-      - [2.0.2.2. SQLite client](#2022-sqlite-client)
-- [3. Build and run Gabriel](#3-build-and-run-gabriel)
-    - [3.0.1. Backend (Rust)](#301-backend-rust)
-    - [3.0.2. Frontend (React)](#302-frontend-react)
-- [4. Inspect Block Aggregate data in SQLite](#4-inspect-block-aggregate-data-in-sqlite)
-- [5. Export Block Aggregate data to CSV](#5-export-block-aggregate-data-to-csv)
-- [6. API Documentation](#6-api-documentation)
-  - [6.1. Latest Block Aggregates](#61-latest-block-aggregates)
-  - [6.2. Block Queries](#62-block-queries)
-  - [6.3. Example Curl Commands](#63-example-curl-commands)
+      - [2.0.2.2. Node JS](#2022-node-js)
+      - [2.0.2.3. OS packages](#2023-os-packages)
+      - [2.0.2.4. SQLite client](#2024-sqlite-client)
+- [3. nakamoto-fetch](#3-nakamoto-fetch)
+- [4. Build and run Gabriel](#4-build-and-run-gabriel)
+    - [4.0.1. Backend (Rust)](#401-backend-rust)
+    - [4.0.2. Frontend (React)](#402-frontend-react)
+- [5. Inspect Block Aggregate data in SQLite](#5-inspect-block-aggregate-data-in-sqlite)
+- [6. Export Block Aggregate data to CSV](#6-export-block-aggregate-data-to-csv)
+- [7. API Documentation](#7-api-documentation)
+  - [7.1. Latest Block Aggregates](#71-latest-block-aggregates)
+  - [7.2. Block Queries](#72-block-queries)
+  - [7.3. Example Curl Commands](#73-example-curl-commands)
 
 
 ## 1. Introduction
@@ -36,7 +37,7 @@ Gabriel requires a stable broadband connection to the internet.
 Gabriel is written in Rust.
 The best way to install Rust is to use [rustup](https://rustup.rs).
 
-##### Node JS
+##### 2.0.2.2. Node JS
 Gabriel includes a ReactJS web frontend.
 
 Gabriel also includes functionality to automatically capture UTXO dashboard charts as png files when a new block is evaluated.
@@ -45,13 +46,13 @@ This chart capture functionality is written in Nodejs.
 Subsequently, you'll need to install `nodejs` and `npm` as per your operating system.
 ie (for Debian ):  `sudo apt install -y nodejs npm`
 
-##### OS packages
+##### 2.0.2.3. OS packages
 
 ```
 # apt install libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxdamage1 libxkbcommon0 libpango-1.0-0 libcairo2 libasound2
 ```
 
-##### 2.0.2.2. SQLite client
+##### 2.0.2.4. SQLite client
   
 Gabriel persists P2PK utxo analysis to a local SQLite database.
 If you would want to inspect this SQLite data directly,
@@ -61,7 +62,16 @@ Once installed, set the SQLITE_ABSOLUTE_PATH environment variable to the path of
   
         $ export SQLITE_ABSOLUTE_PATH=/path/to/gabriel_p2pk.db
 
-## 3. Build and run Gabriel
+## 3. nakamoto-fetch
+
+This project includes an example app called _nakamoto-fetch_ that can be used to test the [nakamoto client](https://github.com/cloudhead/nakamoto/tree/master) .
+
+From the project root, execute:
+```
+$ cargo run --example nakamoto-fetch
+```
+
+## 4. Build and run Gabriel
     
 * You'll need the Gabriel source code:
   ```
@@ -69,7 +79,7 @@ Once installed, set the SQLITE_ABSOLUTE_PATH environment variable to the path of
 
   ```
 
-#### 3.0.1. Backend (Rust)
+#### 4.0.1. Backend (Rust)
 
 Set appropriate environment variables as follows:
 
@@ -122,7 +132,7 @@ $ cargo build
 $ cargo run --release
 ```
 
-#### 3.0.2. Frontend (React)
+#### 4.0.2. Frontend (React)
 The React web application is rendered by the Rust backend server.
 
 Alternatively, you can run the React web application in development mode:
@@ -140,7 +150,7 @@ This will:
 - Connect to the Rust backend API on port 3000
   
 
-## 4. Inspect Block Aggregate data in SQLite
+## 5. Inspect Block Aggregate data in SQLite
 Gabriel will persist analysis of P2PK utxos in a SQLite database.
 
 The path of the SQLite database is the value of the SQLITE_ABSOLUTE_PATH environment variable.
@@ -166,7 +176,7 @@ sqlite> delete from p2pk_utxo_block_aggregates;
 
 ```
 
-## 5. Export Block Aggregate data to CSV
+## 6. Export Block Aggregate data to CSV
 
 ```
 $ sqlite3 $SQLITE_ABSOLUTE_PATH ".headers on" ".mode csv" ".once \
@@ -175,11 +185,11 @@ $ sqlite3 $SQLITE_ABSOLUTE_PATH ".headers on" ".mode csv" ".once \
 ```
 
 
-## 6. API Documentation
+## 7. API Documentation
 
 The API provides several endpoints to query Bitcoin block data and UTXO aggregates:
 
-### 6.1. Latest Block Aggregates
+### 7.1. Latest Block Aggregates
 `GET /api/blocks/latest`
 
 Retrieves UTXO aggregates for recent blocks. Supports query parameters:
@@ -200,12 +210,12 @@ Example responses:
 ]
 ```
 
-### 6.2. Block Queries
+### 7.2. Block Queries
 - `GET /api/block/hash/:hash` - Get block by hash
 - `GET /api/block/height/:height` - Get block by height
 - `GET /api/blocks/stream` - Stream new blocks as Server-Sent Events (SSE)
 
-### 6.3. Example Curl Commands
+### 7.3. Example Curl Commands
 
 ```bash
 # Get latest 10 blocks for P2PK (default)
