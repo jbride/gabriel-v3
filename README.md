@@ -68,7 +68,11 @@ This project includes an example app called _nakamoto-fetch_ that can be used to
 
 From the project root, execute:
 ```
-$ cargo run --example nakamoto-fetch
+$ cargo build --release
+$ export NAKAMOTO_BLOCK_HEIGHT_START=0 \
+    && export NAKAMOTO_PEER_COUNT=4 \
+    && export RUST_LOG=info,p2p=warns,p2p::fsm::invmgr=trace
+$ heaptrack target/release/nakamoto-fetch
 ```
 
 ## 4. Build and run Gabriel
@@ -244,6 +248,32 @@ curl -X PUT "http://0.0.0.0:3000/api/chart/p2pk/generate/latest"
 
 ```
 
+## Nakamoto client topics
+
+### Purpose of Fee Estimator
+
+The [FeeEstimator](https://github.com/cloudhead/nakamoto/blob/v0.4.0/p2p/src/fsm/invmgr.rs#L189) in Nakamoto client is used to estimate tx fees based on blocks.
+When a block is received and processed (in the _received_block_ method), the fee estimator processes the block:
+
+```
+// Process block through fee estimator.
+let fees = self.estimator.process(block.clone(), height);
+```
+
+The estimated fees are then included in the _BlockProcessed_ event:
+
+```
+self.upstream.event(Event::BlockProcessed {
+    block,
+    height,
+    fees,
+});
+```
+
+The fee estimator is analyzing entire blocks to estimate appropriate transaction fees for future transactions.
+This is a common approach in Bitcoin clients - by analyzing recent blocks, the wallet can determine appropriate fee rates to ensure transactions are confirmed in a timely manner.
+The fee estimator likely looks at the transactions in each block to understand what fee rates were sufficient to get included in recent blocks, which helps users set appropriate fees for their own transactions.
+This is not calculating a fee for every UTXO, but rather analyzing transaction fee patterns across blocks to provide fee recommendations.
 
 
 
