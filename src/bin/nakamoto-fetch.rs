@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // Create a client configuration for mainnet
     let mut cfg = Config::new(Network::Mainnet);
-    cfg = cfg.with_fee_estimation(false);
+    //cfg = cfg.with_fee_estimation(false);
     
     // Add specific nodes to connect to
     // Format: "ip:port" or "hostname:port"
