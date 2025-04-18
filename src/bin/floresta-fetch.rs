@@ -20,11 +20,15 @@ use floresta_wire::node_interface::NodeMethods;
 use floresta_wire::running_node::RunningNode;
 use floresta_wire::UtreexoNodeConfig;
 use tokio::sync::RwLock;
+use env_logger;
 
 const DATA_DIR: &str = "./data";
 
 #[tokio::main]
 async fn main() {
+
+    env_logger::init();
+
     // Create a new chain state, which will store the accumulator and the headers chain.
     // It will be stored in the DATA_DIR directory. With this chain state, we don't keep
     // the block data after we validated it. This saves a lot of space, but it means that
@@ -89,6 +93,10 @@ async fn main() {
         if !chain.is_in_idb() {
             break;
         }
+        // Log current chain info
+        let height = chain.get_height().unwrap();
+        println!("Current height: {}", height);
+        
         // Sleep for 10 seconds, and check again
         std::thread::sleep(std::time::Duration::from_secs(10));
     }
